@@ -12,24 +12,165 @@ from scipy import optimize
 import math
 import matplotlib.font_manager as fm
 
-
-# Cu_Si_1 Metall und Halbleiter
+# Cu_Si_1
 #Datenimport
-Cu_Si_1 = pd.read_csv("Daten/Cu_and_Si_1.dat", sep = "\t", header = 4, \
-    names = ["Zeit [s]","T [K]", "R_Probe_1 [Ohm]", "R_Thermom [Ohm]", "R_Probe_2 [Ohm]"])
+Cu_Si_1 = pd.read_csv("Cu_and_Si_1.dat", sep = "\t", header = 4, \
+    names = ["Zeit [s]","T [K]", "R_Cu [Ohm]", "R_Thermom [Ohm]", "R_Si [Ohm]"])
+Cu_Si_2 = pd.read_csv("Cu_and_Si_2.dat", sep = "\t", header = 4, \
+    names = ["Zeit [s]","T [K]", "R_Cu [Ohm]", "R_Thermom [Ohm]", "R_Si [Ohm]"])
+Cu_Si_3 = pd.read_csv("Cu_and_Si_3.dat", sep = "\t", header = 4, \
+    names = ["Zeit [s]","T [K]", "R_Cu [Ohm]", "R_Thermom [Ohm]", "R_Si [Ohm]"])
+#Sort
+Cu_Si_1 = Cu_Si_1.sort_values(by = "Zeit [s]")
+
+#Shift Temperature
+Cu_Si_3_shifted = []
+for i in range(3572) :
+     Cu_Si_3_shifted =  Cu_Si_3["T [K]"] - 20
+
+Cu_Si_2_shifted = []
+for i in range(90) :
+     Cu_Si_2_shifted =  Cu_Si_2["T [K]"] - 20
+#COPPER
+#Shift Resistance
+R_T_1 = []
+for i in range(1161) :
+     R_T_1 =  Cu_Si_1["R_Cu [Ohm]"] - 0.0169
+
+R_T_2 = []
+for i in range(90) :
+     R_T_2 =  Cu_Si_2["R_Cu [Ohm]"] - 0.0169
+
+R_T_3 = []
+for i in range(3572) :
+     R_T_3 =  Cu_Si_3["R_Cu [Ohm]"] - 0.0169
 
 
-#Plot
-plt.errorbar(Cu_Si_1["T [K]"], Cu_Si_1["R_Probe_1 [Ohm]"], \
-    xerr = 0, yerr = 0, c='black', ecolor='red', fmt='.')
+#Calculate RRR
 
-plt.title('Cu_Si_1')
-plt.xlabel('T in K')
-plt.ylabel('R_Probe_1 in Ohm')
+RRR = Cu_Si_3["R_Cu [Ohm]"][3555]/Cu_Si_1["R_Cu [Ohm]"][4]
+print("RRR=",RRR)
+#Fit
+def Fit(T, R_T, T_Debye):
+    return (1.17* R_T *T / T_Debye - 0.17*R_T)
+
+param, params_cov = optimize.curve_fit(Fit, Cu_Si_3_shifted, R_T_3 )
+print("R_T = ",param[0] )
+print("T_Debye = ", param[1])
+#Plot Resistance
+plt.errorbar(Cu_Si_1["T [K]"][0:788], R_T_1[0:788], \
+    xerr = 0, yerr = 0, c='red', ecolor='red', fmt='.')
+
+plt.errorbar(Cu_Si_2_shifted[50:93], R_T_2[50:93], \
+    xerr = 0, yerr = 0, c='blue', ecolor='red', fmt='.')
+
+plt.errorbar(Cu_Si_3_shifted, R_T_3, \
+    xerr = 0, yerr = 0, c='orange', ecolor='red', fmt='.')
+
+plt.errorbar(np.linspace(5,300, 10), Fit(np.linspace(5,300, 10), param[0], param[1]), c= 'black')
+plt.title('Copper Resistance')
+plt.xlabel('T [K]')
+plt.ylabel('R_Cu  [Ohm]')
 
 plt.savefig('Plots/Cu_and_Si_1.png', dpi=300)
-
 plt.clf()
+
+#Universal Reduced Resistivity Plot
+T_red = Cu_Si_1["T [K]"][20:788]/param[1]
+R_red = R_T_1[20:788]/param[0]
+
+#Description fit from Gerthesen
+def Grueneisen(T_red, alpha, beta):
+    return(  beta * ( 1 / ( (1/T_red)**2 + alpha * (1/T_red) ) )  )
+param1, param1_cov = optimize.curve_fit(Grueneisen, T_red, R_red)
+
+print("beta=" , param1[1])
+print("alpha= ", param1[0])
+plt.errorbar(T_red, R_red)
+
+plt.errorbar(np.linspace(0.025 ,0.27, 1000), Grueneisen(np.linspace(0.025 , 0.27, 1000), param1[0], param1[1]), label='Fitted Function', c= 'black')
+
+plt.title('Universal Plot according to Grüneisen Theory')
+plt.xlabel('Reduced Temperature [-]')
+plt.ylabel('Reduced Resistance [-]')
+
+plt.savefig('Plots/univ.png', dpi=300)
+plt.clf()
+
+
+#SILICON
+#Plot Resistance
+
+plt.errorbar(Cu_Si_1["T [K]"][0:788], Cu_Si_1["R_Si [Ohm]"][0:788] )
+
+plt.errorbar(Cu_Si_2_shifted[50:93], Cu_Si_2["R_Si [Ohm]"][50:93])
+
+plt.errorbar(Cu_Si_3_shifted, Cu_Si_3["R_Si [Ohm]"])
+
+
+plt.xlabel('T [K]')
+plt.ylabel('R [Ohm]')
+plt.title("R(T)")
+
+plt.savefig('Plots/Si-Resistance.png', dpi=300)
+plt.clf()
+
+#Plot Resistance high T
+plt.errorbar(Cu_Si_1["T [K]"][600:788], Cu_Si_1["R_Si [Ohm]"][600:788] )
+plt.errorbar(Cu_Si_3_shifted, Cu_Si_3["R_Si [Ohm]"])
+plt.xlabel('T [K]')
+plt.ylabel('R [Ohm]')
+plt.title("R(T)")
+
+plt.savefig('Plots/Si-Resistance-cut.png', dpi=300)
+plt.clf()
+
+
+#Natural log of Conductivity in dependence of inverse T
+k_B = 1.380649e-23
+eV = 1.602e-19
+l = 5e-3
+A = 9e-3 * 0.5e-3
+sigma1 = l/(A*Cu_Si_1["R_Si [Ohm]"][400:788])
+lnrsigma1 = np.log(sigma1)
+sigma2 = l/(A*Cu_Si_2["R_Si [Ohm]"][60:93])
+lnrsigma2 = np.log(sigma2)
+sigma3 = l/(A*Cu_Si_3["R_Si [Ohm]"])
+lnrsigma3 = np.log(sigma3)
+
+T_inv_1 = 1/ Cu_Si_1["T [K]"][400:788]
+T_inv_2 = 1/ Cu_Si_2_shifted[60:93]
+T_inv_3 = 1/ Cu_Si_3_shifted
+
+plt.errorbar(T_inv_1, lnrsigma1)
+
+plt.errorbar(T_inv_2, lnrsigma2)
+
+plt.errorbar(T_inv_3, lnrsigma3)
+
+plt.xlabel('1/T [K⁻¹]')
+plt.ylabel('log(σ) [$ln((m\Omega)^{-1})$]')
+plt.title("Natural log of Conductivity in dependence of inverse Temperature")
+
+plt.savefig('Plots/Si-lnsigma.png', dpi=300)
+plt.clf()
+
+
+#Energy Fit
+plt.errorbar(T_inv_3[69:416], lnrsigma3[69:416])
+def E_fit(T_inv, E_d, q):
+    return(-E_d*T_inv/(2*k_B) + q)
+p, p_cov = optimize.curve_fit(E_fit, T_inv_3[69:416], lnrsigma3[69:416])
+plt.xlabel('1/T [K⁻¹]')
+plt.ylabel('log(σ) [$ln((m\Omega)^{-1})$]')
+plt.title("Natural log of Conductivity in dependence of inverse Temperature")
+
+plt.errorbar(np.linspace(0.0082 ,0.01239, 1000), E_fit(np.linspace(0.0082 , 0.01239, 1000), p[0], p[1]), label='Fitted Function', c= 'black')
+plt.savefig('Plots/Si-extrinsic-range.png', dpi=300)
+
+E_d_err = np.sqrt(np.diag(p_cov))
+print("E_d = ", p[0]/eV, "eV")
+print("Delta E_d = ", E_d_err[0]/eV ,"eV")
 
 
 
