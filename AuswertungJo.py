@@ -51,6 +51,12 @@ perr = np.sqrt(np.diag(params_cov)) #Error of the fit parameters
 print("G = ", params[0], "k = ", params[1], "F = ", params[3] )
 
 #Plot
+plt.rc('xtick', labelsize=13)
+plt.rc('ytick', labelsize=13)
+plt.gcf().subplots_adjust(bottom=0.15)
+plt.gcf().subplots_adjust(left=0.15)
+plt.gcf().subplots_adjust(top=0.9)
+
 plt.errorbar(Nb_Si_2["T[K]"], Nb_Si_2["R_Probe_1[Ohm]"], c='blue', fmt='x')
 plt.errorbar(np.linspace(7,11, 1000), Logis(np.linspace(7,11, 1000), \
     params[0], params[1], params[2], params[3]), label='Fitted function', c= 'black')
@@ -66,7 +72,7 @@ plt.ylabel('$R_{SuperCond}$ [$\Omega$]', fontsize = 14)
 
 plt.text( 8.25, 0.027, "$T_c$ = " + str(round(params[2], 2)) + \
     " $\pm$ " + str(round(perr[2], 3)), fontsize = 15 )
-plt.legend(['Measured Resistivity',  "Fitted Plot", "$T_c$"], fontsize = 12)
+plt.legend(['Measured Resistivity',  "Fitted Plot", "$T_c$"], fontsize = 13)
 
 plt.savefig('Plots/Nb_and_Si_2.png', dpi=300)
 plt.clf()
@@ -132,6 +138,13 @@ print("7 Ampere", params_7[2], "+-", perr_7[2])
 
 
 #Plot
+plt.rc('xtick', labelsize=11)
+plt.rc('ytick', labelsize=11)
+plt.gcf().subplots_adjust(bottom=0.1)
+plt.gcf().subplots_adjust(left=0.15)
+plt.gcf().subplots_adjust(top=0.9)
+
+
 plt.errorbar(Nb_Si_2["T[K]"], Nb_Si_2["R_Probe_1[Ohm]"], fmt='x')
 plt.errorbar(Nb_Si_MF["T[K]"][780:920], Nb_Si_MF["R_Probe_1[Ohm]"][780:920], fmt='x')
 plt.errorbar(Nb_Si_MF["T[K]"][1106:1271], Nb_Si_MF["R_Probe_1[Ohm]"][1106:1271], fmt='x')
@@ -170,8 +183,8 @@ plt.xlim(7, 11)
 plt.ylim(0.015, 0.03)
 
 plt.title('Super Conductor with Magnetic Field', fontsize = 20)
-plt.xlabel('T [K]')
-plt.ylabel('$R_{SuperCond}$ [$\Omega$]')
+plt.xlabel('T [K]', fontsize = 13)
+plt.ylabel('$R_{SuperCond}$ [$\Omega$]', fontsize = 13)
 
 plt.legend([r'$T_{c, 0A}$ = ' + str(round(params[2], 2)) + " $\pm$ " + str(round(perr[2], 3)) , \
  r'$T_{c, 1A}$ = ' + str(round(params_1[2], 2)) + " $\pm$ " + str(round(perr_1[2], 3)) , \
@@ -180,7 +193,7 @@ plt.legend([r'$T_{c, 0A}$ = ' + str(round(params[2], 2)) + " $\pm$ " + str(round
  r'$T_{c, 4A}$ = ' + str(round(params_4[2], 2)) + " $\pm$ " + str(round(perr_4[2], 3)) , \
  r'$T_{c, 5A}$ = ' + str(round(params_5[2], 2)) + " $\pm$ " + str(round(perr_5[2], 3)) , \
  r'$T_{c, 6A}$ = ' + str(round(params_6[2], 2)) + " $\pm$ " + str(round(perr_6[2], 3)) , \
- r'$T_{c, 7A}$ = ' + str(round(params_7[2], 2)) + " $\pm$ " + str(round(perr_7[2], 3))])
+ r'$T_{c, 7A}$ = ' + str(round(params_7[2], 2)) + " $\pm$ " + str(round(perr_7[2], 3))], fontsize = 12)
 
 plt.savefig('Plots/Nb_and_Si_MF.png', dpi=300)
 plt.clf()
@@ -206,14 +219,21 @@ phi = 2.07e-15          #From script
 T_c = params[2]         #Critical temperature without magnetic field
 
 #Fit
-def Fit(T, zeta, y):
-    return  phi/ (2*math.pi*(zeta)**2)  * (1 - T/T_c) + y
+def Fit(T, zeta):
+    return  phi/ (2*math.pi*(zeta)**2)  * (1 - T/T_c)
 
-par, par_cov = optimize.curve_fit(Fit, Tc_over_I["Tc"], Tc_over_I["B"], p0 = [2e-8, 0])  #Fitting critical temperature
+par, par_cov = optimize.curve_fit(Fit, Tc_over_I["Tc"], Tc_over_I["B"], p0 = 2e-8)  #Fitting critical temperature
 err = np.sqrt(np.diag(par_cov)) #Error via fitting parameter
 
 Bc_0 = phi / (2 * np.pi * par[0]**2)   #Calculating Bc(0)
-errB = -Fit(0, par[0] + err[0], par[1]) + Bc_0   #Calculating Bc(0) via Fit: Upper slope straight with y axis
+Bc_02 = Bio(1)/(1-8.8/9.35)         #Bc2 close to the critical temperature should yield a better approximation
+print("Bc_2 for closest measure point", Bc_02)
+errB = -Fit(0, par[0] + err[0]) + Bc_0   #Calculating Bc(0) via Fit: Upper slope straight with y axis
+
+
+l = par[0]**2/39e-9
+lerr = 2 * par[0]/39e-9 * err
+
 #Plot
 plt.rc('xtick', labelsize=16)
 plt.rc('ytick', labelsize=16)
@@ -223,21 +243,26 @@ plt.gcf().subplots_adjust(top=0.85)
 plt.gcf().subplots_adjust(right=0.85)
 
 plt.errorbar(Tc_over_I["Tc"], Tc_over_I["B"], c= 'black', fmt = "^", markersize='16')
-plt.errorbar(np.linspace(7, 9.5), Fit(np.linspace(7.5, 9.5), par[0], par[1] ))
-plt.errorbar(np.linspace(7, 9.5), Fit(np.linspace(7.5, 9.5), (par[0] - err[0]), par[1]))
-plt.errorbar(np.linspace(7, 9.5), Fit(np.linspace(7.5, 9.5), (par[0] + err[0]), par[1]) )
+plt.errorbar(np.linspace(7.42, 9.5), Fit(np.linspace(7.5, 9.5), par[0] ))
+plt.errorbar(np.linspace(7.42, 9.5), Fit(np.linspace(7.5, 9.5), (par[0] - err[0])))
+plt.errorbar(np.linspace(7.42, 9.5), Fit(np.linspace(7.5, 9.5), (par[0] + err[0])) )
 plt.xlim(7, 10)
 plt.ylim(-0.02, 0.23)
 
-plt.title('Magnetic field strength over critical temperature\n', fontsize = 18)
-plt.ylabel('$B[T]$', fontsize = 16)
-plt.xlabel('$T_c[K]$', fontsize = 16)
+plt.title('Critical magnetic field\n', fontsize = 22)
+plt.ylabel('$B_c[T]$', fontsize = 16)
+plt.xlabel('$T[K]$', fontsize = 16)
 
-plt.text( 8.05, 0.2, "$\u03BE_{GL}^0$ = (" + str(round(par[0], 10)) + \
+plt.text( 8.0, 0.2, "$\u03BE_{GL}^0$ = (" + str(round(par[0], 10)) + \
     " $\pm$ " + str(round(err[0], 10)) +") m", fontsize = 15 )  #Zeta GL label
 
-plt.text( 8.2, 0.15, "$B_{c}(0)$ = (" + str(round(Bc_0, 2)) + \
+plt.text( 8.2, 0.17, "$B_{c}(0)$ = (" + str(round(Bc_0, 2)) + \
     " $\pm$ " + str(round(errB, 2)) +") T", fontsize = 15 )   #B_c2(0) label
+
+plt.text( 8.2, 0.14, "$l$ = (" + str(round(l, 10)) + \
+    " $\pm$ " + str(round(lerr[0], 10)) +") m", fontsize = 15 )   #B_c2(0) label
+
+
 
 
 plt.savefig('Plots/Tc_over_I.png', dpi=300)
