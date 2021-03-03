@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import random
 import pandas as pd
 from scipy import optimize
+from scipy import constants
 import math
 import matplotlib.font_manager as fm
 
@@ -58,28 +59,41 @@ param, params_cov = optimize.curve_fit(Fit, Cu_Si_3_shifted, R_T_3 )
 print("R_T = ",param[0] )
 print("T_Debye = ", param[1])
 #Plot Resistance
-plt.errorbar(Cu_Si_1["T [K]"][0:788], R_T_1[0:788], \
-    xerr = 0, yerr = 0, c='red', ecolor='red', fmt='.')
 
-plt.errorbar(Cu_Si_2_shifted[50:93], R_T_2[50:93], \
-    xerr = 0, yerr = 0, c='blue', ecolor='red', fmt='.')
+plt.errorbar(Cu_Si_1["T [K]"][0:788]/param[1], R_T_1[0:788]/param[0], c='red', ecolor='red', fmt='.')
 
-plt.errorbar(Cu_Si_3_shifted, R_T_3, \
-    xerr = 0, yerr = 0, c='orange', ecolor='red', fmt='.')
+plt.errorbar(Cu_Si_2_shifted[50:93]/param[1], R_T_2[50:93]/param[0], c='blue', ecolor='red', fmt='.')
 
-plt.errorbar(np.linspace(5,300, 10), Fit(np.linspace(5,300, 10), param[0], param[1]), c= 'black')
-plt.title('Copper Resistance')
-plt.xlabel('T [K]')
-plt.ylabel('R_Cu  [Ohm]')
+plt.errorbar(Cu_Si_3_shifted/param[1], R_T_3/param[0], c='orange', ecolor='red', fmt='.')
 
+plt.errorbar(np.linspace(5,300, 10)/param[1], Fit(np.linspace(5,300, 10), param[0], param[1])/param[0], c= 'black')
+plt.title('Copper Resistivity', fontsize = 16)
+plt.xlabel(R'$\frac{T}{\Theta_D}$', fontsize = 12)
+plt.ylabel(R'$\frac{R}{R(\Theta_D)}$', fontsize = 12)
+plt.text(0.4, 0.8, "$\Theta_D=$" + str(round(param[1], 1)) + "K", fontsize = 12)
+plt.legend(['experimental data termometer 1', 'experimental data termometer 2', 'experimental data termometer 3', R"Grüneisen fit: $  R_T (T) = 1.17 R_T (\Theta_D )\frac{T}{\Theta_D} - 0.17R_T (\Theta_D )$"], fontsize = 10)
 plt.savefig('Plots/Cu_and_Si_1.png', dpi=300)
 plt.clf()
 
 #Universal Reduced Resistivity Plot
 T_red = Cu_Si_1["T [K]"][20:788]/param[1]
-R_red = R_T_1[20:788]/param[0]
+R_red = (R_T_1[20:788]-R_T_1[20])/param[0]
+
+print("\nhier:  ", R_T_1[20], R_T_1[788])
 
 #Description fit from Gerthesen
+Cu = pd.DataFrame()
+Cu["T"] = [0.266, 0.247, 0.082, 0.062]
+Cu["R"] = [0.132, 0.113, 0.003, 0.002]
+
+Au = pd.DataFrame()
+Au["T"] = [0.328, 0.120, 0.105]
+Au["R"] = [0.207, 0.017, 0.009]
+
+Na = pd.DataFrame()
+Na["T"] = [0.388, 0.282]
+Na["R"] = [0.267, 0.152]
+
 def Grueneisen(T_red, alpha, beta):
     return(  beta * ( 1 / ( (1/T_red)**2 + alpha * (1/T_red) ) )  )
 param1, param1_cov = optimize.curve_fit(Grueneisen, T_red, R_red)
@@ -89,10 +103,15 @@ print("alpha= ", param1[0])
 plt.errorbar(T_red, R_red)
 
 plt.errorbar(np.linspace(0.025 ,0.27, 1000), Grueneisen(np.linspace(0.025 , 0.27, 1000), param1[0], param1[1]), label='Fitted Function', c= 'black')
+plt.errorbar(Cu["T"], Cu["R"], fmt = "s")
+plt.errorbar(Au["T"], Au["R"], fmt = "o")
+plt.errorbar(Na["T"], Na["R"], fmt = "D")
 
-plt.title('Universal Plot according to Grüneisen Theory')
-plt.xlabel('Reduced Temperature [-]')
-plt.ylabel('Reduced Resistance [-]')
+plt.title('Universal Plot according to Grüneisen Theory', fontsize = 16)
+plt.xlabel('Reduced Temperature [-]', fontsize = 12)
+plt.ylabel('Reduced Resistance [-]', fontsize = 12)
+
+plt.legend(["Experimental data Cu", "Grüneisen fit", "Literature value Cu", "Literature value Au", "Literature value Na"], fontsize = 12)
 
 plt.savefig('Plots/univ.png', dpi=300)
 plt.clf()
@@ -101,18 +120,52 @@ plt.clf()
 #SILICON
 #Plot Resistance
 
-plt.errorbar(Cu_Si_1["T [K]"][0:788], Cu_Si_1["R_Si [Ohm]"][0:788] )
+plt.errorbar(Cu_Si_1["T [K]"][400:788], Cu_Si_1["R_Si [Ohm]"][400:788] )
 
 plt.errorbar(Cu_Si_2_shifted[50:93], Cu_Si_2["R_Si [Ohm]"][50:93])
 
 plt.errorbar(Cu_Si_3_shifted, Cu_Si_3["R_Si [Ohm]"])
 
-
-plt.xlabel('T [K]')
+plt.yscale("log")
+plt.xlabel("T [K]")
 plt.ylabel('R [Ohm]')
-plt.title("R(T)")
+plt.title("Resistivity semiconducting doped silicon")
 
 plt.savefig('Plots/Si-Resistance.png', dpi=300)
+plt.clf()
+
+#Fit determination E_g
+
+def E_g(T, C, E_g):
+    k = constants.Boltzmann
+    return C * np.exp(-(E_g)/(2*k*T))
+
+l = 5e-3
+A = 9e-3 * 0.5e-3
+
+param2, param2_cov = optimize.curve_fit(E_g, Cu_Si_1["T [K]"][450:500], (l/A)/Cu_Si_1["R_Si [Ohm]"][450:500], p0 = [1e-6, 1e-20])
+err2 = np.sqrt(np.diag(param2_cov))
+
+print("Die Parameter sind: ", param2)
+print("Und die Fehler: ", err2)
+print("Und in meV: ", err2[1]/constants.e)
+
+plt.errorbar(1/Cu_Si_1["T [K]"][450:788], (l/A)/Cu_Si_1["R_Si [Ohm]"][450:788] )
+
+plt.errorbar(1/Cu_Si_2_shifted[50:93], (l/A)/Cu_Si_2["R_Si [Ohm]"][50:93])
+
+plt.errorbar(1/Cu_Si_3_shifted, (l/A)/Cu_Si_3["R_Si [Ohm]"])
+
+plt.errorbar(1/np.linspace(25, 75, 1000), E_g(np.linspace(25, 75, 1000), param2[0],  param2[1]), c="black")
+
+plt.yscale("log")
+
+plt.text( 0.027, 1, "$E_d$ = " + str(round(param2[1]*1000/constants.e )) + "meV", fontsize = 12)
+plt.xlabel(r"$\frac{1}{T} [K^{-1}]$", fontsize = 12)
+plt.ylabel('$\sigma [m/\Omega]$', fontsize = 12)
+plt.title("Conductivity semiconducting doped silicon", fontsize = 16)
+plt.legend(['experimental data termometer 1', 'experimental data termometer 2','experimental data termometer 3', "fit"], fontsize = 12)
+plt.savefig('Plots/Si-ResistanceII.png', dpi=300)
 plt.clf()
 
 #Plot Resistance high T
@@ -127,8 +180,8 @@ plt.clf()
 
 
 #Natural log of Conductivity in dependence of inverse T
-k_B = 1.380649e-23
-eV = 1.602e-19
+k_B = constants.k
+eV = constants.e
 l = 5e-3
 A = 9e-3 * 0.5e-3
 sigma1 = l/(A*Cu_Si_1["R_Si [Ohm]"][400:788])
@@ -161,11 +214,10 @@ plt.errorbar(T_inv_3[69:416], lnrsigma3[69:416])
 def E_fit(T_inv, E_d, q):
     return(-E_d*T_inv/(2*k_B) + q)
 p, p_cov = optimize.curve_fit(E_fit, T_inv_3[69:416], lnrsigma3[69:416])
+plt.errorbar(np.linspace(0.0082 ,0.01239, 1000), E_fit(np.linspace(0.0082 , 0.01239, 1000), p[0], p[1]), label='Fitted Function', c= 'black')
 plt.xlabel('1/T [K⁻¹]')
 plt.ylabel('log(σ) [$ln((m\Omega)^{-1})$]')
 plt.title("Natural log of Conductivity in dependence of inverse Temperature")
-
-plt.errorbar(np.linspace(0.0082 ,0.01239, 1000), E_fit(np.linspace(0.0082 , 0.01239, 1000), p[0], p[1]), label='Fitted Function', c= 'black')
 plt.savefig('Plots/Si-extrinsic-range.png', dpi=300)
 
 E_d_err = np.sqrt(np.diag(p_cov))
@@ -276,7 +328,15 @@ perr_7 = np.sqrt(np.diag(params_cov_7)) #Error of the fit parameters
 
 print("7 Ampere", params_7[2], "+-", perr_7[2])
 
+#Bio Sarvat
+#Defining function
+def Bio(I):             #Bio Sarvat for the used coil
+    return 0.03233 * I
 
+'''There must be an extra factor included due to the fact, that the probe is not placed in
+the centre of the coil and therefore does not experience a homogenous magnetic field.
+Centre = (33.5cm - 21.5cm)/2 + 21.5cm = 28.5cm, Probe at: 27.5cm --> 1cm. However, the deviation
+is so small, that it does not play a dmoniant role.'''
 
 #Plot
 plt.rc('xtick', labelsize=11)
@@ -326,28 +386,19 @@ plt.ylim(0.015, 0.03)
 plt.title('Super Conductor with Magnetic Field', fontsize = 20)
 plt.xlabel('T [K]', fontsize = 13)
 plt.ylabel('$R_{SuperCond}$ [$\Omega$]', fontsize = 13)
-
-plt.legend([r'$T_{c, 0A}$ = ' + str(round(params[2], 2)) + " $\pm$ " + str(round(perr[2], 3)) , \
- r'$T_{c, 1A}$ = ' + str(round(params_1[2], 2)) + " $\pm$ " + str(round(perr_1[2], 3)) , \
- r'$T_{c, 2A}$ = ' + str(round(params_2[2], 2)) + " $\pm$ " + str(round(perr_2[2], 3)) , \
- r'$T_{c, 3A}$ = ' + str(round(params_3[2], 2)) + " $\pm$ " + str(round(perr_3[2], 3)) , \
- r'$T_{c, 4A}$ = ' + str(round(params_4[2], 2)) + " $\pm$ " + str(round(perr_4[2], 3)) , \
- r'$T_{c, 5A}$ = ' + str(round(params_5[2], 2)) + " $\pm$ " + str(round(perr_5[2], 3)) , \
- r'$T_{c, 6A}$ = ' + str(round(params_6[2], 2)) + " $\pm$ " + str(round(perr_6[2], 3)) , \
- r'$T_{c, 7A}$ = ' + str(round(params_7[2], 2)) + " $\pm$ " + str(round(perr_7[2], 3))], fontsize = 12)
+#plt.grid(True)
+plt.legend([r'$T_{c, 0mT}$ = ' + str(round(params[2], 2)), \
+ r'$T_{c, ' + str(round(Bio(1)*1000)) + "mT}$="  + str(round(params_1[2], 2)),  \
+ r'$T_{c, ' + str(round(Bio(2)*1000)) + "mT}$ = " + str(round(params_2[2], 2)), \
+ r'$T_{c, ' + str(round(Bio(3)*1000)) + "mT}$ = " + str(round(params_3[2], 2)), \
+ r'$T_{c, ' + str(round(Bio(4)*1000)) + "mT}$ = " + str(round(params_4[2], 2)), \
+ r'$T_{c, ' + str(round(Bio(5)*1000)) + "mT}$ = " + str(round(params_5[2], 2)), \
+ r'$T_{c, ' + str(round(Bio(6)*1000)) + "mT}$ = " + str(round(params_6[2], 2)), \
+ r'$T_{c, ' + str(round(Bio(7)*1000)) + "mT}$ = " + str(round(params_7[2], 2))], fontsize = 12)
 
 plt.savefig('Plots/Nb_and_Si_MF.png', dpi=300)
 plt.clf()
 
-#Bio Sarvat
-#Defining function
-def Bio(I):             #Bio Sarvat for the used coil
-    return 0.03233 * I
-
-'''There must be an extra factor included due to the fact, that the probe is not placed in
-the centre of the coil and therefore does not experience a homogenous magnetic field.
-Centre = (33.5cm - 21.5cm)/2 + 21.5cm = 28.5cm, Probe at: 27.5cm --> 1cm. However, the deviation
-is so small, that it does not play a dmoniant role.'''
 
 #Read data
 Tc_over_I = pd.DataFrame()
@@ -397,9 +448,6 @@ plt.xlabel('$T[K]$', fontsize = 16)
 plt.text( 8.0, 0.2, "$\u03BE_{GL}^0$ = (" + str(round(par[0], 10)) + \
     " $\pm$ " + str(round(err[0], 10)) +") m", fontsize = 15 )  #Zeta GL label
 
-plt.text( 8.2, 0.17, "$B_{c}(0)$ = (" + str(round(Bc_0, 2)) + \
-    " $\pm$ " + str(round(errB, 2)) +") T", fontsize = 15 )   #B_c2(0) label
-
 plt.text( 8.2, 0.14, "$l$ = (" + str(round(l, 10)) + \
     " $\pm$ " + str(round(lerr[0], 10)) +") m", fontsize = 15 )   #B_c2(0) label
 
@@ -407,4 +455,33 @@ plt.text( 8.2, 0.14, "$l$ = (" + str(round(l, 10)) + \
 
 
 plt.savefig('Plots/Tc_over_I.png', dpi=300)
+plt.clf()
+
+
+#RRR Nb
+
+RRR = Nb_Si_2["R_Probe_1[Ohm]"][10]/Nb_Si_2["R_Probe_1[Ohm]"][2700]
+
+print("RRR Nb:   ", RRR)
+
+
+#Debye Nb
+def Fit(T, R_T, T_Debye):
+    return (1.17* R_T *T / T_Debye - 0.17*R_T)
+
+param, params_cov = optimize.curve_fit(Fit, Nb_Si_2["T[K]"][10:2000], Nb_Si_2["R_Probe_1[Ohm]"][10:2000]-Nb_Si_2["R_Probe_1[Ohm]"][2000] )
+print("R_T = ",param[0] )
+print("T_Debye = ", param[1])
+#Plot Resistance
+
+plt.errorbar(Nb_Si_2["T[K]"][10:2000]/param[1], (Nb_Si_2["R_Probe_1[Ohm]"][10:2000]-Nb_Si_2["R_Probe_1[Ohm]"][2000])/param[0], c='red', ecolor='red', fmt='.')
+
+
+plt.errorbar(np.linspace(135,275, 10)/param[1], Fit(np.linspace(135,275, 10), param[0], param[1])/param[0], c= 'black')
+plt.title('Niobium Resistivity', fontsize = 16)
+plt.xlabel(R'$\frac{T}{\Theta_D}$', fontsize = 12)
+plt.ylabel(R'$\frac{R}{R(\Theta_D)}$', fontsize = 12)
+plt.text(0.17, 0.1, "$\Theta_D=$" + str(round(param[1], 1)) + "K", fontsize = 12)
+plt.legend(['experimental data termometer 1', R"Grüneisen fit: $  R_T (T) = 1.17 R_T (\Theta_D )\frac{T}{\Theta_D} - 0.17R_T (\Theta_D )$"], fontsize = 10)
+plt.savefig('Plots/Nb_and_Si_1.png', dpi=300)
 plt.clf()
